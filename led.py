@@ -1,11 +1,13 @@
 import sys
 import time
+import RPi.GPIO as GPIO
 
 ##LED操作クラス
 class led:
 
     def __init__(self, port, mode):
-        l = led_sys(port)
+        #l = led_sys(port)
+        l = led_sys_libGPIO(port)
         self.l = l                   # LED下位クラスのインスタンス
         self.available = l.available # 操作可能か
         self.mode = mode             # 点灯モード(1:点滅2:徐々に
@@ -84,7 +86,7 @@ class led:
 
             
 ##LED下位クラス
-##TODO:後で置き換える
+##/sys/class/gpioを使う方法
 class led_sys:
     msec = 1.0/1000.0             # ミリ秒計算用
     gpiobase ="/sys/class/gpio/"  # 制御ファイルの場所
@@ -154,3 +156,50 @@ class led_sys:
 
 
 
+##LED下位クラス
+##RPi.GPIOクラスを使う方法
+class led_sys_libGPIO:
+    msec = 1.0/1000.0
+    wait_mag = 1    #とりあえず1。あとで確認
+
+    def __init__(self, port):
+        self.port = ""
+        self.available = False
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(port, GPIO.OUT)
+            self.port = port
+            self.available = True
+        except Exception as e:
+            print("init error:" + str(e), file=sys.stderr)
+
+    def __del__(self):
+        GPIO.cleanup()
+
+    def light(self, duty):
+        if duty < 0:
+            duty = 0
+        elif duty > 100:
+            duty = 100
+        else:
+            pass
+        # Turn On
+        if duty != 0:
+            sleepmsec = 10.0 * duty / 100.0 * led_sys.wait_mag
+            try:
+                GPIO.output(self.port, GPIO.HIGH)
+                time.sleep(sleepmsec * led_sys.msec)
+            except Exception as e:
+                print(str(e), file=sys.stderr)
+        else:
+            pass
+        # Turn Off
+        if duty != 100:
+            sleepmsec = 10.0 * (100 - duty) / 100.0 * led_sys.wait_mag
+            try:
+                GPIO.output(self.port, GPIO.LOW)
+                time.sleep(sleepmsec * led_sys.msec)
+            except Exception as e:
+                print(str(e), file=sys.stderr)
+        else:
+            pass
